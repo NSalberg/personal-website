@@ -61,6 +61,12 @@ Full Stack Python Development - *wxPython, PyTorch, Pytest*
 **[HTTP Server](https://github.com/NSalberg/zhttp-server)** - *Zig*
 - Built a lightweight HTTP server from scratch in Zig, implementing core features such as request parsing, routing, and response handling
 
+**This Website** - *Zine, NGINX*
+- Deployed a self-hosted website on a repurposed pc using NGINX
+- Configured domain management and DNS to ensure high availability and reliable IP resolution
+- Built a lightweight static site to showcase projects, with full-stack ownership from infrastructure to deployment
+- Zero AWS fees
+
 **Game Show Buzzer App** - *Flutter, Firebase*
 - Built a companion app for games like Jeopardy and Family Feud using Flutter amassing over 10,000 downloads and 300 daily active users 
 - Used Firebase to connect users in real time and enhance user experience  
