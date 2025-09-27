@@ -1,0 +1,178 @@
+---
+.title = "Computer Graphics Project 1",
+.date = @date("2025-09-26T20:00:00"),
+.author = "Nathan Salberg",
+.layout = "post.shtml",
+.draft = false,
+--- 
+
+The first step in this Assignment was to compile the project. Installing the requried packages was super easy, the latest packages were available through arch linux’s pacman repository via a single command: 
+
+
+`sudo pacman -S sdl3 mesa`
+
+That's it, I know people with debian systems were struggling with installing sdl3, I think this displays why arch is the superior distro :P.
+
+Compiling was a breeze it was one command: 
+
+`g++ squareStarter.cpp glad/glad.c -lSDL3  -lGL -ldl -o square`
+
+Running my new square program I found:
+[First compilation](<$image.asset("compiled.png").alt("A colorful pixelated square on a grey background")>)
+
+The code compiled and displayed a colorful square that can be translated by dragging anywhere in the window.
+
+Now for the hard part...
+I have to:
+- Translate only when the user drags on the square's interior (but not on the edge or outside the square)
+- Rotate the square when the user drags on the edges
+- Scale the square when the user drags on the corners
+- Texture the square with an image loaded from a PPM file
+- Significantly brighten the image on the square (without distorting the colors)
+- Reset the square’s position, scale, and orientation when pressing ‘r’
+
+**Translate only when the user drags on the square's interior**
+
+This was fairly straightforward, in the previous homework I had to create a function that returns true when a point is in a triangle:
+
+```cpp
+bool pointInTriangle(Point2D p, Point2D t1, Point2D t2, Point2D t3) {
+  float d1 = vee(p, join(t1, t2));
+  float d2 = vee(p, join(t2, t3));
+  float d3 = vee(p, join(t3, t1));
+  if (d1 * d2 >= 0 and d2 * d3 >= 0)
+    return true;
+  return false;
+}
+```
+We can follow a similar pattern to accept an arbitray length polygon.
+```cpp
+bool pointInPoly(Point2D p, const std::vector<Point2D> &poly) {
+  int n = poly.size();
+  if (n < 3)
+    return false; // not a polygon
+  float sin = sign(vee(p, join(poly[0], poly[(1) % n])));
+
+  for (int i = 1; i < n; ++i) {
+    auto edge = vee(p, join(poly[i], poly[(i + 1) % n]));
+    if (sin != sign(edge)) {
+      return false;
+    }
+  }
+
+return true;
+}
+```
+Then when a user clicks we check if it's inside the polygon and only then do we allow them to translate.
+
+[Video Translate only when clicked inside the square]($link.asset('scale.mp4'))
+
+
+In fact a lot of functions from homework 1 which were designed for only triangles can be repurposed for this projcect.
+
+
+**Rotate the square when the user drags on the edges**
+
+We can calculate the how close the user to an edge of the polygon by repurposing this function: 
+
+`float pointTriangleEdgeDist(Point2D p, Point2D t1, Point2D t2, Point2D t3)`
+
+Just change it to accept a vector of points and, bang, we can now calculate the distance a point is to any arbitrarily shaped polygon.
+
+```cpp
+float pointPolyEdgeDist(Point2D p, const std::vector<Point2D> &poly) {
+
+  int n = poly.size();
+  if (n < 3)
+    return false; // not a polygon
+
+  float d = pointSegmentDistance(p,poly[0], poly[1]);
+  for (int i = 1; i < n; ++i) {
+    d = std::min(d, pointSegmentDistance(p, poly[i], poly[(i + 1) % n]));
+  }
+  return d;
+}
+```
+
+To actually rotate the polygon, when the mouse is clicked near an edge and then dragged 
+```cpp
+// calculate the angle between the original rectangle and current mouse position [0, pi]
+float a = angle(vee(rect_pos, clicked_mouse), vee(rect_pos, cur_mouse));
+// what side of the original rectangle orientation are we on? 
+int sin = sign(areaTriangle(clicked_mouse, rect_pos, cur_mouse));
+rect_angle = clicked_angle + a * sin;
+//....
+//apply motor
+```
+
+[Video rotate]($link.asset('rotate.mp4'))
+
+**Scale the square when the user drags on the corners**
+
+Scaling is a similar story, repurpose:
+`pointTriangleCornerDist(Point2D p, Point2D t1, Point2D t2, Point2D t3)`
+to accept arbitrary length polygons.
+
+Then scale the current polygon if the mouse is dragged on a corner:
+```cpp
+float initial_dist = (clicked_mouse - rect_pos).magnitude();
+float current_dist = (cur_mouse - rect_pos).magnitude();
+if (initial_dist > 0) {
+  float scale_ratio = current_dist / initial_dist;
+  rect_scale = clicked_size * scale_ratio;
+}
+```
+[Video scale]($link.asset('scale.mp4'))
+
+
+**Texture the square with an image loaded from a PPM file**
+
+Loading a texture is pretty easy. We just need to read the PPM files into an array:
+```cpp
+for (int i = img_h - 1; i >= 0; i--) {
+  for (int j = 0; j < img_w; j++) {
+    int r, g, b;
+    ppmFile >> r >> g >> b;
+    img_data[i * img_w * 4 + j * 4] = r;       // Red
+    img_data[i * img_w * 4 + j * 4 + 1] = g;   // Green
+    img_data[i * img_w * 4 + j * 4 + 2] = b;   // Blue
+    img_data[i * img_w * 4 + j * 4 + 3] = 255; // Alpha
+  }
+}
+```
+[Goldy the Gopher]($image.asset('goldy.png'))
+**Significantly brighten the image on the square (without distorting the colors)**
+
+To brighten the image we can scale the rgb values when we read them in:
+```cpp
+for (int i = img_h - 1; i >= 0; i--) {
+  for (int j = 0; j < img_w; j++) {
+
+    int r, g, b;
+    ppmFile >> r >> g >> b;
+    img_data[i * img_w * 4 + j * 4] = std::min(r * 2, 255);     // Red
+    img_data[i * img_w * 4 + j * 4 + 1] = std::min(g * 2, 255); // Green
+    img_data[i * img_w * 4 + j * 4 + 2] = std::min(b * 2, 255); // Blue
+    img_data[i * img_w * 4 + j * 4 + 3] = 255;                  // Alpha
+  }
+}
+```
+[Goldy the Gopher Brightened]($image.asset('goldy-bright.png'))
+
+**Reset the square’s position, scale, and orientation when pressing ‘r’**:
+
+To reset the squares position we can set the global variables to their initial values and update the vertices:
+```cpp
+rect_pos = Point2D(0, 0);
+rect_scale = 1;
+rect_angle = 0;
+p1 = init_p1;
+p2 = init_p2;
+p3 = init_p3;
+p4 = init_p4;
+
+updateVertices();
+```
+
+[Video reset]($link.asset('reset.mp4'))
+
