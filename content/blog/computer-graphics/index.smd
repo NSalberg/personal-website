@@ -65,15 +65,15 @@ return true;
 ```
 Then when a user clicks we check if it's inside the polygon and only then do we allow them to translate.
 
-[Video Translate only when clicked inside the square]($link.asset('scale.mp4'))
+[Translate only when clicked inside the square]($video.asset('scale.mp4').loop(true).autoplay(true).muted(true))
 
 
-In fact a lot of functions from homework 1 which were designed for only triangles can be repurposed for this projcect.
+In fact a lot of functions from homework 1, which were designed for only triangles, can be repurposed for this projcect.
 
 
 **Rotate the square when the user drags on the edges**
 
-We can calculate the how close the user to an edge of the polygon by repurposing this function: 
+We can calculate the how close the user is to an edge of the polygon by repurposing this function: 
 
 `float pointTriangleEdgeDist(Point2D p, Point2D t1, Point2D t2, Point2D t3)`
 
@@ -105,7 +105,7 @@ rect_angle = clicked_angle + a * sin;
 //apply motor
 ```
 
-[Video rotate]($link.asset('rotate.mp4'))
+[Rotate when clicked near edge]($video.asset('rotate.mp4').loop(true).autoplay(true).muted(true))
 
 **Scale the square when the user drags on the corners**
 
@@ -122,7 +122,7 @@ if (initial_dist > 0) {
   rect_scale = clicked_size * scale_ratio;
 }
 ```
-[Video scale]($link.asset('scale.mp4'))
+[Scale when clicked near corner]($video.asset('scale.webm').loop(true).autoplay(true).muted(true))
 
 
 **Texture the square with an image loaded from a PPM file**
@@ -174,5 +174,5 @@ p4 = init_p4;
 updateVertices();
 ```
 
-[Video reset]($link.asset('reset.mp4'))
+[Reset when R is pressed]($video.asset('reset.mp4').loop(true).autoplay(true).muted(true))
 
