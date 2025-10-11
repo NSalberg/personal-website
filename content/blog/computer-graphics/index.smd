@@ -13,7 +13,7 @@ The first step in this Assignment was to compile the project. Installing the req
 
 That's it, I know people with debian systems were struggling with installing sdl3, I think this displays why arch is the superior distro :P.
 
-Compiling was a breeze it was one command: 
+Compiling was a breeze, it was one command: 
 
 `g++ squareStarter.cpp glad/glad.c -lSDL3  -lGL -ldl -o square`
 
