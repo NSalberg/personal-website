@@ -1,0 +1,321 @@
+---
+.title = "Computer Graphics Project 3B - The Raytracer",
+.date = @date("2025-11-01:00:00"),
+.author = "Nathan Salberg",
+.layout = "post.shtml",
+.draft = false,
+--- 
+
+This is a continuation of the previous assignment - the ray-tracer. In addition to the work completed in the previous assignment I was tasked with adding additional features to support triangle renderings and parsing.
+
+To start I added jitterd sampling. The scene parser now has a new arguement, `samples_per_pixel`. 
+Then, instead of sampling a single ray for each pixel in the output image, we jitter the ray casts' direction randomly, sampling `samples_per_pixel` times and averaging the results.
+
+```zig
+for (0..self.samples_per_pixel) |_| {
+    const ray = self.getRay(@intCast(i), @intCast(line_number));
+    color += s.shadeRay(ray, self.max_depth);
+}
+color = color * vec3.splat(self.samples_per_pix_inv.?);
+
+image.setPixel(@intCast(i), @intCast(line_number), color);
+```
+
+Then I set out on getting refraction to work. 
+
+
+After I was satified with my refraction implemention, I worked on implementing triangles.
+
+
+Rendering triangles requires us to create an abstraction over the 'hittable' objects in the scene. 
+Each hittable object ino our scene will implement a `hit(object: Object, ray: main.Ray, ray_tmin: f64, ray_tmax: f64) ?main.HitRecord` function which returns null if no hit occurs or a struct called `hitRecord` with information about the hit, like the normal, distance, and material.
+
+To create a sort of  'base class' in zig we can use a union enum. 
+This enum defines a hit function which all members of the union will have to implement. The function `hit()` just calls the hit function for the corresponing `Object` it was called on
+
+```zig 
+pub const Object = union(enum) {
+    sphere: Sphere,
+    triangle: Triangle,
+    normal_triangle: NormalTriangle,
+
+    pub fn hit(object: Object, ray: main.Ray, ray_tmin: f64, ray_tmax: f64) ?main.HitRecord {
+        return switch (object) {
+            inline else => |obj| obj.hit(ray, ray_tmin, ray_tmax),
+        };
+    }
+}
+```
+
+Then, when parsing the scene file we add all spheres, and triangles to an `ArrayList` of type `Object`
+
+
+`try scene.objects.append(allocator, objects.Object{ .triangle = tri });`
+
+// mention triangle hit? 
+
+Finally, I parallelized my ray tracer by dividing each line of the ray-tracer across a thread pool.
+Zig makes this pretty easy. First we create our thread pool         
+```zig
+var pool: std.Thread.Pool = undefined;
+try pool.init(.{
+.allocator = allocator,
+});
+defer pool.deinit();
+```
+The defer line automatcally calls join on all the threads when we exit the current scope. 
+Then for each scan line we can give that task to one of the threads in our thread pool
+```zig
+var wg: std.Thread.WaitGroup = .{};
+for (0..img_height) |j| {
+    pool.spawnWg(&wg, Camera.scanLine, .{ self, j, &output_img, s, line_pb });
+```
+
+// show speed increase
+
+
+
+
+Now that we have built our scene, we need to trace some rays. I copied the example in HW3 over to zig.
+
+```zig
+for (0..img_width) |i| {
+    for (0..img_height) |j| {
+        const f_i: f32 = @floatFromInt(i);
+        const f_j: f32 = @floatFromInt(j);
+        const u: f32 = f_half_w - @as(f32, @floatFromInt(img_width)) * (f_i + 0.5) * inv_img_width;
+        const v: f32 = f_half_h - @as(f32, @floatFromInt(img_height)) * (f_j + 0.5) * inv_img_height;
+
+        const p: Vec3 = s.camera_pos - vec3.splat(d) * s.camera_fwd + vec3.splat(u) * s.camera_right + vec3.splat(v) * s.camera_up;
+        const ray_dir: Vec3 = vec3.unit(p - s.camera_pos);
+        for (s.spheres.items) |sphere| {
+            const hit = raySphereIntersect(s.camera_pos, ray_dir, sphere);
+            const color = if (hit) Vec3{ 1, 1, 1 } else Vec3{ 0, 0, 0 };
+            output_img.setPixel(@intCast(i), @intCast(j), color);
+        }
+    }
+}
+```
+
+And we get some images!
+[f3-zoom-in.jpg]($image.asset("f3-zoom-in.jpg"))
+
+Okay we are now at the same spot as HW3.
+
+To receive full credit for this assignment I needed to complete 10 of the following, with the underlined being required.
+
+Scene Setup:
+- <u>Camera placement, film resolution, aspect ratio</u>
+- User specified background colors
+- UI + OpenGL output
+- BMP or PNG output
+
+Primitives:
+- <u>Spheres</u>
+- Difference/Intersection of spheres (Constructive Solid Geometry)
+
+Lighting:
+- <u>Ambient lights</u>
+- <u>Point light sources</u>
+- Shadows
+- Multiple light sources
+- Directional light sources
+- Spot light sources
+
+Sampling:
+- <u>Basic Sampling</u>
+- Jittered Supersampling
+- Adaptive Supersampling
+- Motion Blur
+- Depth of Field
+
+Materials:
+- <u>Color & Specularity (Phong Lighting Model)</u>
+- Refraction
+- Reflection
+
+We already have a few complete by copying the starter code from HW3.
+
+We can change the camera placement:
+[spheres1.png]($image.asset("spheres1.png").size(0,300))
+[camera_pos.png]($image.asset("camera_pos.png").size(0,300))
+Or the film resolution / aspect ratio:
+[camera_res.png]($image.asset("camera_res.png").size(0,200))
+Or the fov:
+[camera_fov.png]($image.asset("camera_fov.png").size(0,200))
+Or a .bmp:
+[camera_bmp.bmp]($image.asset("camera_fov.png").size(0,200))
+
+First I implemented ambient lighting: 
+```
+pub const AmbientLight = struct {
+    intensity: Vec3,
+    pub fn illuminate(self: AmbientLight, ray: main.Ray, hit_record: main.HitRecord, scene: *const Scene) Vec3 {
+        _ = scene;
+        _ = ray;
+        return self.intensity * hit_record.material.ambient_color;
+    }
+};
+```
+For each pixel, if we hit a sphere, the color of the sphere is the intensity of the ambient light multplied by the ambient color of the sphere.
+If we don't hit a sphere we can set the background to the background color.
+
+[spheres1_only_ambient.png]($image.asset("spheres1_only_ambient.png").size(0,300))
+
+
+Then I added blinn-phong shading material and point lights.
+
+For a point light the intensity of the light depends on the angle of incidence, the normal of the object, and the distance from the object to the light.
+
+```zig
+pub const PointLight = struct {
+    color: Vec3,
+    loc: Vec3,
+
+    pub fn illuminate(self: PointLight, ray: main.Ray, hit_record: main.HitRecord, scene: *const Scene) Vec3 {
+        _ = scene;
+        const n = hit_record.surface_normal;
+        const x = ray.eval(hit_record.distance);
+        const r = vec3.norm(self.loc - x);
+        const l = (self.loc - x) / vec3.splat(r);
+
+        const E = vec3.splat(@max(0, vec3.dot(n, l))) * self.color / vec3.splat(r * r);
+        const k = hit_record.material.evaluate(vec3.unit(l), vec3.unit(ray.point - x), n);
+        return E * k;
+    }
+};
+```
+Each sphere contains a Material struct that defines how it interacts with light sources.
+The evaluate function implements a blinn-phong shading model.
+```zig
+const pi_inv: f64 = 1.0 / std.math.pi;
+pub const Material = struct {
+    ambient_color: Vec3 = Vec3{ 0, 0, 0 },
+    diffuse_color: Vec3 = Vec3{ 1, 1, 1 },
+    specular_color: Vec3 = Vec3{ 0, 0, 0 },
+    specular_coefficient: f64 = 5,
+    transmissive_color: Vec3 = Vec3{ 0, 0, 0 },
+    index_of_refraction: f64 = 1,
+
+    pub fn evaluate(self: Material, l: Vec3, v: Vec3, n: Vec3) Vec3 {
+        const h = vec3.unit(l + v);
+        const diffuse = self.diffuse_color * vec3.splat(pi_inv);
+        const specular = self.specular_color * vec3.splat(std.math.pow(f64, @max(0, vec3.dot(n, h)), self.specular_coefficient));
+        return diffuse + specular;
+    }
+}
+```
+
+[spheres1_blinn_phong++.png]($image.asset("spheres1_blinn_phong++.png").size(0,300))
+
+Implementing shadows from here is pretty easy. We can check if reflection ray hits any objects. If it does we are in a shadow and we don't illumnate.
+
+```zig
+const srec = scene.hit(.{ .point = x, .dir = l }, 0.002, r);
+if (srec != null) {
+    // we hit an object on the way to the light so we in shadow
+    return vec3.zero;
+} else {
+    const E = vec3.splat(@max(0, vec3.dot(n, l))) * self.color / vec3.splat(r * r);
+    const k = hit_record.material.evaluate(vec3.unit(l), vec3.unit(ray.point - x), n);
+    return E * k;
+}
+```
+
+[spheres1_with_shadow.png]($image.asset("spheres1_with_shadow.png").size(0,300))
+
+
+And we can do multiple light sources too by looping over each Light in the scene and adding the result of illuminate to the color.
+
+```zig
+for (scene.lights.items) |light| {
+    color += light.illuminate(ray, closest_hit);
+}
+```
+[multi_light.png]($image.asset("multi_light.png").size(0,300))
+
+
+**Extra Credit**
+
+*Directional Lights*
+
+Directional lights are like point lights, but their energy doesn’t follow the inverse square law and they emit light in a fixed direction instead of from a point
+
+```zig
+pub const DirectionalLight = struct {
+    color: Vec3,
+    direction: Vec3,
+
+    pub fn illuminate(self: DirectionalLight, ray: main.Ray, hit_record: main.HitRecord, scene: *const Scene) Vec3 {
+        const x = ray.eval(hit_record.distance);
+        // Here l = -direction where in point light l = vec3.unit(self.loc - x);
+        const l = vec3.unit(-self.direction);
+        const n = hit_record.surface_normal;
+
+        const srec = scene.hit(.{ .point = x, .dir = -self.direction }, 0.002, std.math.inf(f64));
+        if (srec != null) {
+            // we hit an object on the way to the light so we in shadow
+            return vec3.zero;
+        } else {
+            const E = self.color * vec3.splat(@max(0, vec3.dot(n, l)));
+            const v = vec3.unit(ray.point - x);
+            // k does not fall of by r*r
+            const k = hit_record.material.evaluate(vec3.unit(l), v, n);
+            return E * k;
+        }
+    }
+
+}
+```
+[directional_light.png]($image.asset("directional_light.png").size(0,300))
+
+
+*Reflections*
+
+To add reflections we can add a recursive call to our shadeRay function.
+```zig
+pub fn shadeRay(self: Scene, ray: main.Ray, bounces: u16) Vec3 {
+    const hit_obj: ?main.HitRecord = self.hit(ray, 0, std.math.inf(f64));
+    var color: Vec3 = self.background;
+
+    // we got a hit
+    if (hit_obj != null) {
+        color = vec3.zero;
+        for (self.lights.items) |light| {
+            // Reflect
+            color += light.illuminate(ray, hit_obj.?, &self);
+            if (bounces > 0) {
+
+                const n = hit_obj.?.surface_normal;
+                const reflection = ray.dir - vec3.splat(2 * vec3.dot(ray.dir, n)) * n;
+                // bounce_point + eps * normal
+                const p = ray.eval(hit_obj.?.distance) + n * vec3.splat(0.001);
+                // Recurse adding on the reflected ray
+                color += hit_obj.?.material.specular_color * self.shadeRay(.{ .dir = reflection, .point = p }, bounces - 1);
+            }
+        }
+    }
+    return color;
+}
+```
+
+[reflection.png]($image.asset("reflection.png").size(0,300))
+
+
+**Code**
+
+
+[zipfile]($link.asset('project3-nathan-salberg.zip'))
+
+The code requires zig version 0.15.1 or greater and can be compiled with
+`zig build -Doptimize=ReleaseFast`
+
+Then the executable can be run with `./zig-out/bin/project_3a MyScenes/camera_pos.txt`
+
+**Additional Scenes**
+
+[spheres2.png]($image.asset("spheres2.png").size(0,300))
+
+
+
+
