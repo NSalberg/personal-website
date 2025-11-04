@@ -41,15 +41,17 @@ if (vec3.magnitude2(material.transmissive_color) > 0.001) {
 }
 ```
 
+[spheres2 Refraction]($image.asset("spheres2-refract.png").size(0,400))
 
+The result is pretty clear in the green sphere on the left.
 After I was satified with my refraction implemention, I worked on implementing triangles.
 
 
-Rendering triangles requires us to create an abstraction over the 'hittable' objects in the scene. 
-Each hittable object ino our scene will implement a `hit(object: Object, ray: main.Ray, ray_tmin: f64, ray_tmax: f64) ?main.HitRecord` function which returns null if no hit occurs or a struct called `hitRecord` with information about the hit, like the normal, distance, and material.
+Rendering triangles requires us to create an abstraction over the 'hittable' objects in our scene. 
+Each hittable object in our scene will implement a `hit(object: Object, ray: main.Ray, ray_tmin: f64, ray_tmax: f64) ?main.HitRecord` function which returns null if no hit occurs or a struct called `hitRecord` with information about the hit, like the normal, distance, and material.
 
-To create a sort of  'base class' in zig we can use a union enum. 
-This enum defines a hit function which all members of the union will have to implement. The function `hit()` just calls the hit function for the corresponing `Object` it was called on
+To create this sort of  'base class' in zig we can use a union enum. 
+This enum defines a hit function which all structs in the union will have to implement. The function `hit()` just calls the hit function for the corresponing sub-struct it was called on
 
 ```zig 
 pub const Object = union(enum) {
@@ -67,13 +69,27 @@ pub const Object = union(enum) {
 
 Then, when parsing the scene file we add all spheres, and triangles to an `ArrayList` of type `Object`
 
+```zig
+const tri = objects.Triangle.init(
+    v0,
+    v1,
+    v2,
+    @as(u16, @intCast(s.materials.items.len)) - 1,
+);
+try scene.objects.append(allocator, objects.Object{ .triangle = tri });
+```
 
-`try scene.objects.append(allocator, objects.Object{ .triangle = tri });`
+To intersect triangles we can use the barycentric coordinates computed using the [Möller–Trumbore intersection algorithm]($link.url("https://en.wikipedia.org/wiki/Möller–Trumbore_intersection_algorithm"))
 
-// mention triangle hit? 
+[Plant]($image.asset("plant.png").size(0,400))
+[Reaching Hand]($image.asset("reachingHand.png").size(0,400))
+[Arm]($image.asset("arm.png").size(0,400))
+[Bottle]($image.asset("bottle.png").size(0,400))
+[Gear]($image.asset("gear.png").size(0,400))
+
 
 Finally, I parallelized my ray tracer by dividing each line of the ray-tracer across a thread pool.
-Zig makes this pretty easy. First we create our thread pool         
+Zig makes this pretty easy. First we create our thread pool:
 ```zig
 var pool: std.Thread.Pool = undefined;
 try pool.init(.{
@@ -83,24 +99,57 @@ defer pool.deinit();
 ```
 The defer line automatcally calls join on all the threads when we exit the current scope. 
 Then for each scan line we can give that task to one of the threads in our thread pool
+
 ```zig
 var wg: std.Thread.WaitGroup = .{};
 for (0..img_height) |j| {
     pool.spawnWg(&wg, Camera.scanLine, .{ self, j, &output_img, s, line_pb });
 ```
 
-// show speed increase
+Testing the parallel implementation on my Intel(R) Core(TM) i5-9400F - over 6 threads gave the following results
+| Scene | Parallel(s)   | Single-Threaded(s) | Speedup | 
+| :-------: | :-----------: | :-----------: | :-----------: |
+| Gear    |  59.29 | 336.31   | 5.67 |
+| Arm-top | 0.94  | 5.41     | 5.75x |
+| Arm-reach | 1.82  | 10.43  | 5.73x |
+| Bottle | 27.72 | 188.70    | 6.08x |
 
+**Extra Credit**
 
+*BVH*
+
+I implemented a BVH tree using [this]($link.url("https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/")) website as an outline for contruction of the bvh.
+I also took a lot of inspiration from the popular [RayTracing in One Weekend]($link.url("https://raytracing.github.io/books/RayTracingTheNextWeek.html#boundingvolumehierarchies")) website. 
+
+The speedup from the bvh was very scene dependent.
+
+| Scene | BVH | Brute Force Loop | Speedup | 
+| :-------: | :-----------: | :-----------: | :-----------: |
+| spheres2 | 3.32 | 2.58 | 0.78x |
+| Arm-top | 1.3  | 258.74 | 199.03x |
+| Arm-reach | 2.1  | 444.19 | 211.52x |
+| Bottle | 27.72 |  33.33 | 1.20x |
+| Dragon | 480.452564 | 471.97 | 0.98x |
+| Gear   |  59.29 | 698.007321 | 12.03x |
+| Watch | 79.983598 | NA | NA |
+
+[Watch]($image.asset("watch_blue_and_gold.png").size(0,400))
+[Dragon]($image.asset("dragon.png").size(0,400))
+I'm not quite sure why the dragon scene does not see as much of a speedup compared to the others. I think it might be because of the the reflective floor. Maybe a better spit heuristic would help?
+Or maybe following [jacco's blog]($link.url("https://jacco.ompf2.com/2022/04/18/how-to-build-a-bvh-part-2-faster-rays/")) on quicker ray intersection would help.
 
 
 
 **Code**
 
+[zipfile]($link.asset('proj3b-nathan-salberg.zip'))
 
 
-**Additional Scenes**
+**Halloween Extension**
 
+I dressed up as Walter White this Halloween
+
+[]($image.asset("Walter.jpeg").size(0,400))
 
 
 
