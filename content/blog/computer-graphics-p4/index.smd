@@ -1,0 +1,80 @@
+---
+.title = "Computer Graphics Project 4 - OpenGL",
+.date = @date("2025-11-22:00:00"),
+.author = "Nathan Salberg",
+.layout = "post.shtml",
+.draft = false,
+--- 
+
+
+In this assignment I was tasked with implementing a simple maze game using OpenGL and SDL. The player explores the environment looking for keys which will open doors until the goal is found. 
+
+The map that the player explores is defined by a grid of characters. Walkable areas are represented by 0s, walls by Ws, keys by lowercase letters, and doors by uppercase letters.
+```
+5 5
+0000G
+WW0W0
+0WAW0
+0W0WW
+S000a
+```
+Initially, I attempted to write the assignment using the example code from HW4, however I got sick of writing C++ real fast. I simply do not enjoy writing C++, so I ported the code to a language I enjoy - Zig.
+
+To start I needed to find zig libraries to call OpenGL and SDL. I could have directly imported the c headers but why do that when existing, more Zig friendly, bindings exist.
+
+Luckily, the [SDL]($link.url('https://github.com/castholm/SDL')) project also provides a port of the project that uses the Zig build system. This made it super easy to import sdl functions I need.
+
+
+Now for OpenGL, [zigglgen]($link.url('https://github.com/castholm/zigglgen')) provides a very nice wrapper around the OpenGL library.
+
+
+zigglgen generates declarations for OpenGL functions, constants, types and extensions using the original names as
+defined in the various OpenGL specifications (as opposed to the prefixed names used in C).
+
+|           | C                     | Zig                |
+|-----------|:----------------------|:-------------------|
+| Command   | `glClearColor`        | `ClearColor`       |
+| Constant  | `GL_TRIANGLES`        | `TRIANGLES`        |
+| Type      | `GLfloat`             | `float`            |
+| Extension | `GL_ARB_clip_control` | `ARB_clip_control` |
+
+
+And for the math library, I used [zlm]($link.url('https://github.com/ziglibs/zlm')) which aims to be a zig implementation of the glm library.
+
+To start, I reimplemented the scene parser. 
+
+The scene parser populates an array list with the map of the maze. It also marks important positions like location of the player and of the goal.
+
+
+```
+pub var player_pos: Vec3 = undefined;
+pub var goal_pos: Vec2 = undefined;
+pub var map_width: usize = 0;
+pub var map_height: usize = 0;
+pub var game_map: std.ArrayList([]u8) = undefined;
+pub var keys_collected: std.AutoHashMap(u8, void) = undefined;
+```
+
+After parsing the scene we need to initialize SDL.
+
+
+[reflection.png]($image.asset("reflection.png").size(0,300))
+
+
+**Code**
+
+
+[zipfile]($link.asset('project3-nathan-salberg.zip'))
+
+The code requires zig version 0.15.1 or greater and can be compiled with
+`zig build -Doptimize=ReleaseFast`
+
+Then the executable can be run with `./zig-out/bin/project_3a MyScenes/camera_pos.txt`
+
+**Additional Scenes**
+
+[spheres2.png]($image.asset("spheres2.png").size(0,300))
+
+
+
+

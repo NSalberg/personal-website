@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+  <head id="head">
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1">
+    <title>Nathan Salberg</title>
+    <link type="text/css" rel="stylesheet" href="/style.css">
+    <link type="text/css" rel="stylesheet" href="/highlight.css">
+    <!-- mathtex -->
+    <link type="text/css" rel="stylesheet" href="/Temml-Local.css">
+    <script defer src="/temml.min.js"></script>
+    <script defer src="/render-mathtex.js"></script>
+    <!-- /mathtex -->
+    
+  <style>
+    #prev-next {
+     display: flex;
+     flex-direction: row;
+     justify-content: space-between;
+     margin-top: 40px;
+    }
+
+    figure {
+      align-self: center;
+      text-align: center;
+      font-style: italic;
+    }
+
+    .post {
+      display:flex;
+      flex-direction: column;
+    }
+  </style>
+
+  </head>
+  <body id="body">
+    <h1 class="site-title">Nathan Salberg</h1>
+    <nav>
+      <a href="/">About</a>
+       &nbsp; • &nbsp;
+      <a href="/blog/">Blog</a>
+    </nav>
+    
+  <h1>Computer Graphics Project 1</h1>
+  <div class="post"><p>The first step in this Assignment was to compile the project. Installing the requried packages was super easy, the latest packages were available through arch linux’s pacman repository via a single command:</p><p><code>sudo pacman -S sdl3 mesa</code></p><p>That’s it, I know people with debian systems were struggling with installing sdl3, I think this displays why arch is the superior distro :P.</p><p>Compiling was a breeze it was one command:</p><p><code>g++ squareStarter.cpp glad/glad.c -lSDL3  -lGL -ldl -o square</code></p><p>Running my new square program I found: <figure><img src="/blog/computer-graphics/compiled.png" alt="A colorful pixelated square on a grey background">
+<figcaption>First compilation</figcaption></figure></p><p>The code compiled and displayed a colorful square that can be translated by dragging anywhere in the window.</p><p>Now for the hard part… I have to now:</p><ul><li>Translate only when the user drags on the square’s interior (but not on the edge or outside the square)</li><li>Scale the square when the user drags on the corners</li><li>Rotate the square when the user drags on the edges</li><li>Texture the square with an image loaded from a PPM file</li><li>Significantly brighten the image on the square (without distorting the colors)</li><li>Reset the square’s position, scale, and orientation when pressing ‘r’</li></ul><p><strong>Translate only when the user drags on the square’s interior</strong></p><p>This was fairly straightforward, in the previous homework I had to create a function that returns true when a point is in a triangle:</p><pre><code class="cpp"><span class="type">bool</span> <span class="constant variable function">pointInTriangle</span>(<span class="type">Point2D</span> <span class="constant variable">p</span>, <span class="type">Point2D</span> <span class="constant variable">t1</span>, <span class="type">Point2D</span> <span class="constant variable">t2</span>, <span class="type">Point2D</span> <span class="constant variable">t3</span>) {
+  <span class="type">float</span> <span class="constant variable">d1</span> <span class="operator">=</span> <span class="constant variable function">vee</span>(<span class="constant variable">p</span>, <span class="constant variable function">join</span>(<span class="constant variable">t1</span>, <span class="constant variable">t2</span>))<span class="delimiter">;</span>
+  <span class="type">float</span> <span class="constant variable">d2</span> <span class="operator">=</span> <span class="constant variable function">vee</span>(<span class="constant variable">p</span>, <span class="constant variable function">join</span>(<span class="constant variable">t2</span>, <span class="constant variable">t3</span>))<span class="delimiter">;</span>
+  <span class="type">float</span> <span class="constant variable">d3</span> <span class="operator">=</span> <span class="constant variable function">vee</span>(<span class="constant variable">p</span>, <span class="constant variable function">join</span>(<span class="constant variable">t3</span>, <span class="constant variable">t1</span>))<span class="delimiter">;</span>
+  <span class="keyword">if</span> (<span class="constant variable">d1</span> <span class="operator">*</span> <span class="constant variable">d2</span> &gt;= <span class="number">0</span> and <span class="constant variable">d2</span> <span class="operator">*</span> <span class="constant variable">d3</span> &gt;= <span class="number">0</span>)
+    <span class="keyword">return</span> true<span class="delimiter">;</span>
+  <span class="keyword">return</span> false<span class="delimiter">;</span>
+}
+</code></pre>
+<p>We can follow a similar pattern to accept an arbitray length polygon.</p><pre><code class="cpp"><span class="type">bool</span> <span class="constant variable function">pointInPoly</span>(<span class="type">Point2D</span> <span class="constant variable">p</span>, <span class="keyword">const</span> <span class="type">std</span>::<span class="type">vector</span><span class="operator">&lt;</span><span class="type">Point2D</span><span class="operator">&gt;</span> <span class="operator">&amp;</span><span class="constant variable">poly</span>) {
+  <span class="type">int</span> <span class="constant variable">n</span> <span class="operator">=</span> <span class="constant variable">poly</span><span class="delimiter">.</span><span class="property function">size</span>()<span class="delimiter">;</span>
+  <span class="keyword">if</span> (<span class="constant variable">n</span> <span class="operator">&lt;</span> <span class="number">3</span>)
+    <span class="keyword">return</span> false<span class="delimiter">;</span> <span class="comment">// not a polygon</span>
+  <span class="type">float</span> <span class="constant variable">sin</span> <span class="operator">=</span> <span class="constant variable function">sign</span>(<span class="constant variable function">vee</span>(<span class="constant variable">p</span>, <span class="constant variable function">join</span>(<span class="constant variable">poly</span>[<span class="number">0</span>], <span class="constant variable">poly</span>[(<span class="number">1</span>) % <span class="constant variable">n</span>])))<span class="delimiter">;</span>
+
+  <span class="keyword">for</span> (<span class="type">int</span> <span class="constant variable">i</span> <span class="operator">=</span> <span class="number">1</span><span class="delimiter">;</span> <span class="constant variable">i</span> <span class="operator">&lt;</span> <span class="constant variable">n</span><span class="delimiter">;</span> <span class="operator">++</span><span class="constant variable">i</span>) {
+    <span class="type">auto</span> <span class="constant variable">edge</span> <span class="operator">=</span> <span class="constant variable function">vee</span>(<span class="constant variable">p</span>, <span class="constant variable function">join</span>(<span class="constant variable">poly</span>[<span class="constant variable">i</span>], <span class="constant variable">poly</span>[(<span class="constant variable">i</span> <span class="operator">+</span> <span class="number">1</span>) % <span class="constant variable">n</span>]))<span class="delimiter">;</span>
+    <span class="keyword">if</span> (<span class="constant variable">sin</span> <span class="operator">!=</span> <span class="constant variable function">sign</span>(<span class="constant variable">edge</span>)) {
+      <span class="keyword">return</span> false<span class="delimiter">;</span>
+    }
+  }
+
+  <span class="keyword">return</span> true<span class="delimiter">;</span>
+}
+</code></pre>
+<p>Then when a user clicks we check if it’s inside the polygon and only then do we allow them to translate.</p><p><figure><video>
+<source src="/blog/computer-graphics/scale.webm">
+</video>
+<figcaption>This is  caption</figcaption></figure></p><p>In fact a lot of functions from homework 1 which were designed for only triangles can be converted for this projcect.</p><p>This post is defined in <code>content/blog/first-post/</code> and contains the following files:</p><ul><li><code>index.smd</code></li><li><code>fanzine.jpg</code></li></ul><p>Another interesting thing about this post is that it uses the <code>layouts/post.shtml</code> template which adds at the bottom page navigation within the blog section.</p><p>Enough about Zine, let’s talk about zines.</p><h2>Fanzines</h2><p>A zine (short for <em>fanzine</em>, from “fan” + “magazine”) is a non-professional publication created by people that want to express themselves in paper form, usually in relation to a cultural phenomenon of some kind.</p><p><figure><img src="/blog/computer-graphics/fanzine.jpg" alt="A photo of a black and white flyer. The main title reads 'A night of pure energy' and the rest of the page contains a mix of pictures of guitarists interleaved with other text snippets, some seemingly taken from a professional publication of some kind, and some handwritten to announce concert night dates, presumably for the musicians in the picture.">
+<figcaption>An example of zine from 1976.</figcaption></figure></p><h2>Zines in the digital era</h2><p>In the digital age, some of the cultural impetus behind zines got redirected to personal blogs and similar digital, non-professional publications. The 90’s and early 00’s are famous for their whacky websites full of clip art, wordart text and “under construction” animated gifs.</p><p>This initial organic exploration didn’t last for too long as the rise of social media diverted a lot of self-expression energy towards walled gardens, a change that was also fueled by the much tighter and intense feedback loop that those platform enable.</p><p>In the 90’s the stongest dopamine hit you could get was adding a visit counter to your altavista website and watch it go up, slowly, mostly because of your own accesses. In modern times views are almost meaningless and interactions such as <em>likes</em>, <em>retweets</em> and <em>comments</em> provide much stronger positive feedback.</p><p>An unfortunate side effect of this new cultural wave centered around social media is that not only you end up gifting your content to platform owners, but you also participate in a system where the <em>language</em> of the social media site shapes your thoughts and experience in specific, and often user-hostile, ways.</p><p>Art, just like liquids, takes the shape of the container you put it in. A mobile game that lives off of in app purchases will never be truly great because of the tension between making the game entertaining enough to keep players engaged, and the need to make it boring enough so that they will want to buy upgrades to make the game more fun.</p><p>Similarly, self-expression on Twitter is encouraged to take the shape of short, hyperbolic hot takes that forgo nuance in order to create catchy quips that can be used for hasty decision making.</p><p>Likewise, <span class="wave ">corpowave</span> never goes out of style on LinkedIn. Spend enough time in there and you will become a character from Severance.</p><h2>We’re not in 1990 anymore</h2><p>Despite all the issues with social media, there is no point in thinking of the 90’s as a better time. It was not. And despite the winks at the past, Zine is not a tool for indulging in nostalgia.</p><p><strong>The goal is to make art</strong>: the act of inducing a change in others through our self-expression.</p><p>You could argue that the 90’s excelled at self-expression, but in doing so you would also have to accept that social media is infinitely more effective at inducing change in others (albeit at the expense of freedom of expression).</p><p>Once you realize that, the path forward is clear:</p><ol><li>Own your content.</li><li>Create new social systems that optimize for creating art over engagement.</li></ol><p>Owning your content means that you will be unaffected by enshittification of platforms that would otherwise keep your data hostage. It also is the single most effective thing you can do as an individual to take power away from platforms, all while protecting your own immediate interests.</p><p>Creation of new social systems is a <em>slightly more hairy</em> problem than self hosting a static website, but it’s something that can be done. Over the years we’ve had plenty of social outlets that have allowed people to socialize through their homemade games, music, drawings, fanfics, etc; and chances are that we have yet many more of these outlets ahead of us to create.</p><p>Zine gives you a small puzzle piece to help you inch closer toward a better future, partially by providing you with a new iteration over tried and true patterns (e.g. by facilitating content creation by separating content from layouting concerns as much as possible), and also by being a bit experimental with the concept of a devlog, something that you wouldn’t normally expect to find on a static website.</p><p>Lastly, Zine makes sure your content (both blog and devlog, but also any other content format you might come up with yourself) is available via RSS syndication. RSS feeds are far from a winning technology in the fight against the ebb and <em>enshitty</em>flow of social media, but they are another small puzzle piece that costs nothing to maintain and that might turn out to be critical once enough other preconditions are met.</p><p>With that in mind, <strong>go make art with your words</strong>.</p><p>– Loris</p></div>
+  <div id="prev-next">
+    <div>
+      <a href="/blog/second-post/">
+        ←
+        <span>Second Post</span>
+      </a>
+    </div>
+    <div></div>
+  </div>
+
+    <footer>
+      <hr>
+      <h5>SITE UNDER CONSTRUCTION</h5>
+      <img src="/under-construction.gif" width="90">
+    </footer>
+  </body>
+</html>
