@@ -1,6 +1,6 @@
 ---
 .title = "Computer Graphics Final Project",
-.date = @date("2025-14-22:00:00"),
+.date = @date("2025-12-14:00:00"),
 .author = "Nathan Salberg",
 .layout = "post.shtml",
 .draft = false,
@@ -13,7 +13,7 @@ The main goal of this project was to make it easier to build interesting scenes 
 To achieve this goal, I set out to use OpenGl along with SDL3 to create a tighter iteration loop for scene creation.
 This would require GUI components to manipulate object properties like material type, and location, along with light properties like emmision intensity and direction. As I've explained before, I'm not a big fan of C++, so I wrote this project in Zig.
 
-Since, I've already written the project4 application in Zig using OpenGL and SDL3 so I thought it would be a pretty easy port over to this project. However, that did not turn out to be the case. It turns out that linking against a UI package was a bit harder than I thought. Previously, in project 4, I linked OpenGL and SDL through seperate existing Zig repackages. I probably could have figured out how to link the Dear ImGui library along with that too, but that would have taken a lot of time. I ended up using [this](https://github.com/tiawl/cimgui.zig) Zig package which already sets up the ImGui package along with OpenGL and SDL3 for us.
+Since, I've already written the project4 application in Zig using OpenGL and SDL3 so I thought it would be a pretty easy port over to this project. However, that did not turn out to be the case. It turns out that linking against a UI package was a bit harder than I thought. Previously, in project 4, I linked OpenGL and SDL through seperate existing Zig repackages. I probably could have figured out how to link the Dear ImGui library along with that too, but that would have taken a lot of time. I ended up using [this](https://github.com/tiawl/cimgui.zig) Zig package which already set up the ImGui package along with OpenGL and SDL3 for me.
 
 As for the implementation, it was all fairly straight forward. Once I got the [example script](https://github.com/tiawl/cimgui.zig/blob/trunk/examples/example_sdl3_opengl3/main.zig) to compile from the Zig ImGui library, I started trying to render a simple scene of a cube, with the ImGui Demo Window on top.
 
@@ -28,13 +28,13 @@ Then I worked on adding custom ImGui Windows. I knew I wanted something similar 
 [Object Window]($image.asset("obj-window.png").size(0,500))
 
 The user can select their objects and change their color.
-Then I wanted users to be able to import their own mesh objects. I couldn't find a file picker implementation using ImGui that didn't require linking a new library, so I crreated my own. The open button recursively searches the users current working directory for any files with a .obj format
+Then I wanted users to be able to import their own mesh objects. I couldn't find a file picker implementation using ImGui that didn't require linking a new library, so I created my own. The open button recursively searches the users current working directory for any files with a .obj extension.
 
 [Custom Asset]($video.asset('bunny-add.mp4').loop(true).autoplay(true).muted(true))
 
 One implementation challenge I faced was the abstraction of the scene environment. It took some time for me to realize that there should not be a one->one relationship from mesh to object but instead a one->many. This led to the key idea that I needed to seperate mesh creation from object creation. 
 
-Here's what my final scene implementation looks like:
+Here's what my final scene struct implementation looks like:
 ```zig
 pub const Scene = struct {
     camera: Camera = Camera{
@@ -49,7 +49,7 @@ pub const Scene = struct {
 
 }
 ```
-To add a mesh to the scene we simply add a `CpuMesh` to the meshes ArrayList (similar to vector in C++/rust) and when we create a new object, we append it to the `objects` ArrayList. Each `Object` simply holds an index into the mesh and `Material` ArrayList, along with its location, scale, and rotation in XYZ space.
+To add a mesh to the scene we simply add a `CpuMesh` to the meshes ArrayList and when we create a new object, we append it to the `objects` ArrayList. Each `Object` simply holds an index into the mesh and `Material` ArrayList, along with its location, scale, and rotation in XYZ space.
 These mesh indexes also map to a corresponding GPUMesh on the GPU.
 
 ```zig
@@ -64,18 +64,19 @@ pub const SceneRenderer = struct {
     program: c_uint,
 }
 ```
+Now the user can add arbitrary .obj meshes, add objects by mesh type, and customize their material properties. Here's what that process looks like:
 
 
 [Features Demo]($video.asset('demo.mp4').loop(true).autoplay(true).muted(true))
 
-These scenes can be exported into the file format from project3.
+These scenes cant then be exported into the file format from project3.
 
 Example Render
 
 [Preview]($image.asset("scene-preview.png").size(0,500))
 [Render]($image.asset("scene-render.png").size(0,500))
 
-Unfortunately my raytracer is horrendously slow for scenes with complex models, even with the BVH. I was only able to render 1 scene with the bunny model.
+Unfortunately, even with a BVH, my raytracer is horrendously slow for scenes with complex models. As a result, I was only able to render 1 scene with the bunny model.
 
 [Preview]($image.asset("bunny-preview.png").size(0,500))
 [Render]($image.asset("bunny.png").size(0,500))
@@ -96,7 +97,7 @@ I used the Zig programming language version 15.2, along with the Zig package fro
 There are many directions I could take this in the future. To begin, the lights placed around the scene could provide actual illumination inside interactive scene. 
 The rayracer itself could be parallelized using the GPU, and a live view of the progress could be displayed to the user.
 Additionally, object selection could be improved by using a simple raycasting shader to select objects via the viewport instead of only from the Object menu.
-Finally, Gizmos could be introduced to move objects interactivly instead of only through the object editor
+Finally, gizmos could be introduced to move objects interactivly instead of only through the object editor
 
 
 #### Code 
